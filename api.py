@@ -86,16 +86,17 @@ def enviar_sms():
             "mensaje": mensaje
         })
 
-    except Exception as e:
+   except Exception as e:
 
-        print("\nERROR:")
-        print(str(e))
+    print("================================")
+    print("ERROR MQTT")
+    print(type(e).__name__)
+    print(str(e))
+    print("================================")
 
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
+    return jsonify({
+        "success": False,
+        "error": 
 
 # ======================================
 # ENDPOINT DE PRUEBA
