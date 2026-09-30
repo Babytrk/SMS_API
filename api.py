@@ -1,50 +1,29 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
-import json
-import paho.mqtt.client as mqtt
+from uuid import uuid4
 import os
-# ======================================
-# CONFIGURACION MQTT
-# ======================================
-
-BROKER = "localhost"
-PUERTO = 1883
-TOPICO = "maulec/sms/send"
-
-# ======================================
-# FLASK
-# ======================================
 
 app = Flask(__name__)
 
-
-# ======================================
-# PUBLICAR MQTT
-# ======================================
-
-def publicar_mqtt(payload):
-
-    client = mqtt.Client()
-
-    client.connect(
-        BROKER,
-        PUERTO,
-        60
-    )
-
-    resultado = client.publish(
-        TOPICO,
-        json.dumps(payload)
-    )
-
-    client.disconnect()
-
-    return resultado.rc
+# COLA DE MENSAJES
 
 
-# ======================================
-# ENDPOINT ENVIAR SMS
-# ======================================
+mensajes_pendientes = []
+
+# HOME
+
+@app.route("/", methods=["GET"])
+def home():
+
+    return jsonify({
+        "estado": "ok",
+        "mensajes_pendientes": len([
+            m for m in mensajes_pendientes
+            if m["estado"] == "PENDIENTE"
+        ])
+    })
+
+# RECIBIR MENSAJE DESDE POWER AUTOMATE
 
 @app.route("/enviar_sms", methods=["POST"])
 def enviar_sms():
@@ -53,78 +32,129 @@ def enviar_sms():
 
         data = request.get_json()
 
-        print("\n================================")
-        print("NUEVA PETICION RECIBIDA")
-        print("================================")
-        print(data)
-
-        telefono = data.get("Telefono")
-        mensaje = data.get("Mensaje")
-
-        payload = {
-            "telefono": telefono,
-            "mensaje": mensaje,
+        mensaje = {
+            "id": str(uuid4()),
+            "telefono": data.get("Telefono"),
+            "mensaje": data.get("Mensaje"),
             "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "origen": "PowerApps"
+            "origen": "PowerApps",
+            "estado": "PENDIENTE"
         }
 
-        print("\nPUBLICANDO MQTT...")
-        print(payload)
+        mensajes_pendientes.append(mensaje)
 
-        resultado = publicar_mqtt(payload)
-
-        print(f"Resultado MQTT: {resultado}")
-
-        if resultado == 0:
-            print("MENSAJE PUBLICADO CORRECTAMENTE")
-        else:
-            print("ERROR AL PUBLICAR MQTT")
+        print("\n================================")
+        print("NUEVO MENSAJE RECIBIDO")
+        print(mensaje)
+        print("================================\n")
 
         return jsonify({
             "success": True,
-            "telefono": telefono,
-            "mensaje": mensaje
+            "id": mensaje["id"],
+            "mensaje": "SMS agregado a la cola"
         })
 
-   except Exception as e:
+    except Exception as e:
 
-    print("================================")
-    print("ERROR MQTT")
-    print(type(e).__name__)
-    print(str(e))
-    print("================================")
+        print("ERROR:", str(e))
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+# OBTENER MENSAJES PENDIENTES
+
+@app.route("/mensajes", methods=["GET"])
+def obtener_mensajes():
+
+    pendientes = [
+        mensaje
+        for mensaje in mensajes_pendientes
+        if mensaje["estado"] == "PENDIENTE"
+    ]
+
+    return jsonify(pendientes)
+
+# CONFIRMAR ENVIO
+@app.route("/confirmar", methods=["POST"])
+def confirmar():
+
+    try:
+
+        data = request.get_json()
+
+        mensaje_id = data.get("id")
+
+        for mensaje in mensajes_pendientes:
+
+            if mensaje["id"] == mensaje_id:
+
+                mensaje["estado"] = "ENVIADO"
+
+                print(f"SMS confirmado: {mensaje_id}")
+
+                return jsonify({
+                    "success": True,
+                    "id": mensaje_id
+                })
+
+        return jsonify({
+            "success": False,
+            "error": "Mensaje no encontrado"
+        }), 404
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+# VER TODOS LOS MENSAJES
+
+@app.route("/mensajes_todos", methods=["GET"])
+def mensajes_todos():
+
+    return jsonify(mensajes_pendientes)
+
+# LIMPIAR COLA
+
+@app.route("/limpiar", methods=["POST"])
+def limpiar():
+
+    mensajes_pendientes.clear()
 
     return jsonify({
-        "success": False,
-        "error": 
-
-# ======================================
-# ENDPOINT DE PRUEBA
-# ======================================
-
-@app.route("/", methods=["GET"])
-def home():
-
-    return jsonify({
-        "estado": "ok",
-        "broker": BROKER,
-        "topico": TOPICO
+        "success": True,
+        "mensaje": "Cola limpiada"
     })
 
+# ESTADISTICAS
 
-# ======================================
+@app.route("/estadisticas", methods=["GET"])
+def estadisticas():
+
+    pendientes = len([
+        m for m in mensajes_pendientes
+        if m["estado"] == "PENDIENTE"
+    ])
+
+    enviados = len([
+        m for m in mensajes_pendientes
+        if m["estado"] == "ENVIADO"
+    ])
+
+    return jsonify({
+        "total": len(mensajes_pendientes),
+        "pendientes": pendientes,
+        "enviados": enviados
+    })
 # INICIO
-# ======================================
-
-import os
-
 if __name__ == "__main__":
 
     print("==============================")
-    print("API MQTT INICIADA")
-    print(f"Broker : {BROKER}")
-    print(f"Puerto : {PUERTO}")
-    print(f"Topico : {TOPICO}")
+    print("API SMS INICIADA")
     print("==============================")
 
     port = int(os.environ.get("PORT", 5000))

@@ -15,7 +15,7 @@ def on_message(client, userdata, msg):
         print("\n================================")
         print("MENSAJE MQTT RECIBIDO")
         print("================================")
-        print("ID :", data.get("id"))
+        print("ID       :", data.get("id"))
         print("Telefono :", data.get("telefono"))
         print("Mensaje  :", data.get("mensaje"))
         print("Fecha    :", data.get("fecha"))
