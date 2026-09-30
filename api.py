@@ -115,18 +115,20 @@ def home():
 # INICIO
 # ======================================
 
+import os
+
 if __name__ == "__main__":
- 
-print("==============================")
-print("API MQTT INICIADA")
-print(f"Broker : {BROKER}")
-print(f"Puerto : {PUERTO}")
-print(f"Topico : {TOPICO}")
-print("==============================")
- 
-port = int(os.environ.get("PORT", 5000))
- 
-app.run(
-host="0.0.0.0",
-port=port
-)
+
+    print("==============================")
+    print("API MQTT INICIADA")
+    print(f"Broker : {BROKER}")
+    print(f"Puerto : {PUERTO}")
+    print(f"Topico : {TOPICO}")
+    print("==============================")
+
+    port = int(os.environ.get("PORT", 5000))
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
